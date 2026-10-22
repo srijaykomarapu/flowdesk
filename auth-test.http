@@ -1,0 +1,41 @@
+
+### Register a user
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Test Employee",
+  "email": "employee@example.com",
+  "password": "TestPass123"
+}
+
+
+### Login
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "employee@example.com",
+  "password": "TestPass123"
+}
+
+
+### Get tickets using JWT
+### ADMIN - View all tickets
+GET  http://localhost:8080/api/tickets
+Content-Type: application/json
+Authorization:Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJlbXBsb3llZUBleGFtcGxlLmNvbSIsInVzZXJJZCI6MSwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzkyNjg3Nzk3LCJleHAiOjE3OTI3NzQxOTd9.XCvBPIrApLHzS864ysontZottUfVWdMN1kuoXob-Nxs
+
+{
+  "title": "Security test",
+  "description": "Testing ticket ownership",
+  "category": "Software",
+  "priority": "LOW",
+  "createdBy": "someone-else",
+  "assignedTo": ""
+}
+
+### ADMIN - Get ticket 1
+GET http://localhost:8080/api/tickets/1
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJlbXBsb3llZUBleGFtcGxlLmNvbSIsInVzZXJJZCI6MSwicm9sZSI6IkVNUExPWUVFIiwiaWF0IjoxNzkyNjg5NDk5LCJleHAiOjE3OTI3NzU4OTl9.qLeWE4KBesFkXIbNoQ_dsMisBes6isFuy1BN9gfLlp8
+

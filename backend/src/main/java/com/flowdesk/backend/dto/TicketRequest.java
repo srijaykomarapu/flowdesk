@@ -18,11 +18,8 @@ public record TicketRequest(
     @Size(max = 100, message = "Category cannot exceed 100 characters")
     String category,
 
-    @NotBlank(message = "Created by is required")
-    @Size(max = 100, message = "Created by cannot exceed 100 characters")
-    String createdBy,
-
     @Size(max = 100, message = "Assigned to cannot exceed 100 characters")
     String assignedTo
+
 ) {
 }
