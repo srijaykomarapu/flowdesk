@@ -11,8 +11,8 @@
 	<groupId>com.flowdesk</groupId>
 	<artifactId>backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
+	<name>FlowDesk</name>
+	<description>IT Service Management Platform</description>
 	<url/>
 	<licenses>
 		<license/>

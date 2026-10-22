@@ -1,0 +1,21 @@
+
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+application-local.properties
+
+# Java and Maven build output
+**/target/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# Frontend dependencies and build output
+node_modules/
+dist/
+
+# Logs
+*.log
