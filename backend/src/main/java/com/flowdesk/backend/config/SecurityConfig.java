@@ -95,9 +95,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(
-            List.of("http://localhost:5173")
-        );
+        config.setAllowedOrigins(List.of(
+            "http://localhost:5173",
+            "https://flowdesk-frontend-cy63.onrender.com"
+        ));
 
         config.setAllowedMethods(
             List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
