@@ -5,6 +5,7 @@ import {
   AlertCircle,
   BarChart3,
   Bell,
+  Check,
   CheckCircle2,
   ChevronDown,
   CircleHelp,
@@ -27,9 +28,16 @@ import {
 } from "lucide-react";
 
 import ticketApi from "./api/ticketApi";
+import agentApi from "./api/agentApi";
 import authApi from "./api/authApi";
+import userApi from "./api/userApi";
 import "./App.css";
 import "./Auth.css";
+import "./EmployeeDashboard.css";
+import "./UserManagement.css";
+import "./Notifications.css";
+import "./Reports.css";
+import "./Settings.css";
 
 const navigation = [
   { name: "Dashboard", icon: LayoutDashboard },
@@ -69,7 +77,37 @@ function getInitials(name) {
     .toUpperCase();
 }
 
-function TicketTable({ tickets, onStatusChange, onDelete }) {
+function TicketTable({ tickets, currentUser, onStatusChange, onDelete, onAssign }) {
+  const [assignmentEmails, setAssignmentEmails] = useState({});
+  const [agents, setAgents] = useState([]);
+  const [agentSearch, setAgentSearch] = useState({});
+  const [openAgentList, setOpenAgentList] = useState({});
+  const [loadingAgents, setLoadingAgents] = useState(false);
+  const canManageTickets = ["AGENT", "ADMIN"].includes(currentUser?.role);
+  const canDeleteTickets = currentUser?.role === "ADMIN";
+
+  useEffect(() => {
+    if (!canManageTickets) return;
+
+    let active = true;
+    setLoadingAgents(true);
+
+    agentApi.getAgents()
+      .then((data) => {
+        if (active) setAgents(Array.isArray(data) ? data : []);
+      })
+      .catch((error) => {
+        console.error("Unable to load agents:", error);
+      })
+      .finally(() => {
+        if (active) setLoadingAgents(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [canManageTickets]);
+
   if (tickets.length === 0) {
     return (
       <div className="table-message">
@@ -122,36 +160,163 @@ function TicketTable({ tickets, onStatusChange, onDelete }) {
               </td>
 
               <td>
-                <select
-                  className={`status-select ${String(
-                    ticket.status || "OPEN"
-                  ).toLowerCase()}`}
-                  aria-label={`Change status for ticket ${ticket.id}`}
-                  value={ticket.status || "OPEN"}
-                  onChange={(event) =>
-                    onStatusChange(ticket.id, event.target.value)
-                  }
-                >
-                  <option value="OPEN">Open</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="RESOLVED">Resolved</option>
-                  <option value="CLOSED">Closed</option>
-                </select>
+                {canManageTickets ? (
+                  <select
+                    className={`status-select ${String(
+                      ticket.status || "OPEN"
+                    ).toLowerCase()}`}
+                    aria-label={`Change status for ticket ${ticket.id}`}
+                    value={ticket.status || "OPEN"}
+                    onChange={(event) =>
+                      onStatusChange(ticket.id, event.target.value)
+                    }
+                  >
+                    <option value="OPEN">Open</option>
+                    <option value="IN_PROGRESS">In Progress</option>
+                    <option value="RESOLVED">Resolved</option>
+                    <option value="CLOSED">Closed</option>
+                  </select>
+                ) : (
+                  <span>{readable(ticket.status || "OPEN")}</span>
+                )}
               </td>
 
               <td>{formatDate(ticket.createdAt)}</td>
 
-              <td>{ticket.assignedTo || "Unassigned"}</td>
+              <td>
+                <div className="ticket-title">
+                  <span>{ticket.assignedTo || "Unassigned"}</span>
+                  {canManageTickets && (
+                    <div className="assignment-controls agent-picker">
+                      <input
+                        type="text"
+                        role="combobox"
+                        aria-label={`Search agents for ticket ${ticket.id}`}
+                        aria-expanded={Boolean(openAgentList[ticket.id])}
+                        aria-controls={`agent-options-${ticket.id}`}
+                        placeholder={loadingAgents ? "Loading agents..." : "Search agents..."}
+                        autoComplete="off"
+                        value={agentSearch[ticket.id] ?? ""}
+                        disabled={loadingAgents}
+                        onFocus={() =>
+                          setOpenAgentList((current) => ({
+                            ...current,
+                            [ticket.id]: true,
+                          }))
+                        }
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setAgentSearch((current) => ({
+                            ...current,
+                            [ticket.id]: value,
+                          }));
+                          setAssignmentEmails((current) => ({
+                            ...current,
+                            [ticket.id]: "",
+                          }));
+                          setOpenAgentList((current) => ({
+                            ...current,
+                            [ticket.id]: true,
+                          }));
+                        }}
+                        onBlur={() =>
+                          setTimeout(() =>
+                            setOpenAgentList((current) => ({
+                              ...current,
+                              [ticket.id]: false,
+                            })), 150)
+                        }
+                      />
+                      {openAgentList[ticket.id] && (
+                        <div
+                          className="agent-options"
+                          id={`agent-options-${ticket.id}`}
+                          role="listbox"
+                        >
+                          {agents
+                            .filter((agent) => {
+                              const query = (agentSearch[ticket.id] ?? "").toLowerCase();
+                              return `${agent.fullName} ${agent.email}`
+                                .toLowerCase()
+                                .includes(query);
+                            })
+                            .map((agent) => (
+                              <button
+                                type="button"
+                                className="agent-option"
+                                key={agent.id ?? agent.email}
+                                role="option"
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => {
+                                  setAssignmentEmails((current) => ({
+                                    ...current,
+                                    [ticket.id]: agent.email,
+                                  }));
+                                  setAgentSearch((current) => ({
+                                    ...current,
+                                    [ticket.id]: `${agent.fullName} (${agent.email})`,
+                                  }));
+                                  setOpenAgentList((current) => ({
+                                    ...current,
+                                    [ticket.id]: false,
+                                  }));
+                                }}
+                              >
+                                <strong>{agent.fullName}</strong>
+                                <small>{agent.email}</small>
+                              </button>
+                            ))}
+                          {agents.filter((agent) => {
+                            const query = (agentSearch[ticket.id] ?? "").toLowerCase();
+                            return `${agent.fullName} ${agent.email}`
+                              .toLowerCase()
+                              .includes(query);
+                          }).length === 0 && (
+                            <span className="agent-empty">
+                              {agents.length === 0 ? "No agents available" : "No matching agents"}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled={!assignmentEmails[ticket.id]}
+                        onClick={async () => {
+                          const success = await onAssign(
+                            ticket.id,
+                            assignmentEmails[ticket.id]
+                          );
+                          if (success) {
+                            setAssignmentEmails((current) => ({
+                              ...current,
+                              [ticket.id]: "",
+                            }));
+                            setAgentSearch((current) => ({
+                              ...current,
+                              [ticket.id]: "",
+                            }));
+                          }
+                        }}
+                      >
+                        Assign
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </td>
 
               <td>
-                <button
-                  className="icon-button table-action"
-                  title="Delete ticket"
-                  aria-label={`Delete ticket ${ticket.id}`}
-                  onClick={() => onDelete(ticket.id)}
-                >
-                  <Trash2 size={16} />
-                </button>
+                {canDeleteTickets && (
+                  <button
+                    className="icon-button table-action"
+                    title="Delete ticket"
+                    aria-label={`Delete ticket ${ticket.id}`}
+                    onClick={() => onDelete(ticket.id)}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </td>
             </tr>
           ))}
@@ -168,7 +333,6 @@ function CreateTicketModal({ onClose, onCreate, loading, currentUserName }) {
     category: "Technical Support",
     priority: "MEDIUM",
     createdBy: currentUserName,
-    assignedTo: "",
   });
 
   function updateField(event) {
@@ -271,16 +435,6 @@ function CreateTicketModal({ onClose, onCreate, loading, currentUserName }) {
             </label>
           </div>
 
-          <label>
-            Assign to
-            <input
-              name="assignedTo"
-              value={form.assignedTo}
-              onChange={updateField}
-              placeholder="Leave empty if unassigned"
-            />
-          </label>
-
           <div className="modal-actions">
             <button
               type="button"
@@ -302,6 +456,250 @@ function CreateTicketModal({ onClose, onCreate, loading, currentUserName }) {
         </form>
       </section>
     </div>
+  );
+}
+
+
+
+function UserManagement({ currentUser }) {
+  const [users, setUsers] = useState([]);
+  const [roleChanges, setRoleChanges] = useState({});
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [updatingId, setUpdatingId] = useState(null);
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const loadUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    setError("");
+
+    try {
+      const data = await userApi.getAll();
+      const safeUsers = Array.isArray(data) ? data : [];
+      setUsers(safeUsers);
+      setRoleChanges(
+        Object.fromEntries(safeUsers.map((user) => [user.id, user.role]))
+      );
+    } catch (err) {
+      console.error("Unable to load users:", err);
+      setError(
+        err.response?.data?.detail ||
+          err.response?.data?.message ||
+          "Could not load users. Make sure you are signed in as an admin."
+      );
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentUser?.role === "ADMIN") {
+      loadUsers();
+    } else {
+      setLoadingUsers(false);
+    }
+  }, [currentUser, loadUsers]);
+
+  async function handleUpdateRole(user) {
+    const newRole = roleChanges[user.id];
+
+    if (!newRole || newRole === user.role) return;
+
+    if (user.id === currentUser.id) {
+      setError("For safety, you cannot change your own role here.");
+      return;
+    }
+
+    setUpdatingId(user.id);
+    setError("");
+    setSuccess("");
+
+    try {
+      const updatedUser = await userApi.updateRole(user.id, newRole);
+
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === user.id ? { ...item, ...updatedUser } : item
+        )
+      );
+      setRoleChanges((current) => ({
+        ...current,
+        [user.id]: updatedUser.role,
+      }));
+      setSuccess(`Role updated for ${updatedUser.fullName}.`);
+    } catch (err) {
+      console.error("Unable to update user role:", err);
+      setError(
+        err.response?.data?.detail ||
+          err.response?.data?.message ||
+          "Could not update this user's role. Please try again."
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  const filteredUsers = users.filter((user) =>
+    `${user.fullName} ${user.email} ${user.role}`
+      .toLowerCase()
+      .includes(search.trim().toLowerCase())
+  );
+
+  if (currentUser?.role !== "ADMIN") {
+    return (
+      <section className="placeholder-panel">
+        <div className="placeholder-icon"><ShieldCheck size={27} /></div>
+        <h2>Admin access required</h2>
+        <p>Only administrators can view and manage user accounts.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="ticket-panel user-management-panel">
+      <div className="panel-header">
+        <div>
+          <h2>User management</h2>
+          <p>View accounts and manage access across your FlowDesk workspace.</p>
+        </div>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={loadUsers}
+          disabled={loadingUsers}
+        >
+          <RefreshCw size={15} className={loadingUsers ? "spin" : ""} />
+          {loadingUsers ? "Refreshing..." : "Refresh users"}
+        </button>
+      </div>
+
+      {error && (
+        <div className="error-banner" role="alert">
+          <AlertCircle size={18} />
+          <span>{error}</span>
+          <button type="button" onClick={() => setError("")} aria-label="Dismiss error">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {success && (
+        <div className="user-success-message" role="status">
+          <CheckCircle2 size={17} />
+          <span>{success}</span>
+          <button type="button" onClick={() => setSuccess("")} aria-label="Dismiss success">
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
+      <div className="user-management-toolbar">
+        <label className="search-box">
+          <Search size={17} />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search name, email, or role..."
+            aria-label="Search users"
+          />
+          {search && (
+            <button
+              type="button"
+              className="search-clear"
+              aria-label="Clear user search"
+              onClick={() => setSearch("")}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </label>
+        <span className="user-count">{filteredUsers.length} user(s)</span>
+      </div>
+
+      {loadingUsers ? (
+        <div className="table-message">
+          <RefreshCw className="spin" size={25} />
+          <strong>Loading users...</strong>
+        </div>
+      ) : filteredUsers.length === 0 ? (
+        <div className="table-message">
+          <Users size={28} />
+          <strong>{users.length ? "No matching users" : "No users found"}</strong>
+          <span>Try another search term.</span>
+        </div>
+      ) : (
+        <div className="table-scroll">
+          <table className="ticket-table user-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Email</th>
+                <th>Registered</th>
+                <th>Role</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.map((user) => {
+                const selectedRole = roleChanges[user.id] || user.role;
+                const isSelf = user.id === currentUser.id;
+
+                return (
+                  <tr key={user.id}>
+                    <td>
+                      <div className="user-table-identity">
+                        <span className="avatar user-table-avatar">
+                          {getInitials(user.fullName)}
+                        </span>
+                        <div className="ticket-title">
+                          <strong>{user.fullName}</strong>
+                          {isSelf && <span className="user-self-label">You</span>}
+                        </div>
+                      </div>
+                    </td>
+                    <td>{user.email}</td>
+                    <td>{formatDate(user.createdAt)}</td>
+                    <td>
+                      <select
+                        className="status-select user-role-select"
+                        value={selectedRole}
+                        disabled={isSelf || updatingId === user.id}
+                        aria-label={`Role for ${user.fullName}`}
+                        onChange={(event) =>
+                          setRoleChanges((current) => ({
+                            ...current,
+                            [user.id]: event.target.value,
+                          }))
+                        }
+                      >
+                        <option value="EMPLOYEE">Employee</option>
+                        <option value="AGENT">Agent</option>
+                        <option value="ADMIN">Admin</option>
+                      </select>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="secondary-button user-update-button"
+                        disabled={
+                          isSelf ||
+                          updatingId === user.id ||
+                          selectedRole === user.role
+                        }
+                        onClick={() => handleUpdateRole(user)}
+                      >
+                        {updatingId === user.id ? "Updating..." : "Update role"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -454,10 +852,22 @@ export default function App() {
   const [activePage, setActivePage] = useState("Dashboard");
   const [tickets, setTickets] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [connectionState, setConnectionState] = useState("idle");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [readNotificationIds, setReadNotificationIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`flowdesk-read-notifications-${JSON.parse(localStorage.getItem("flowdesk-user") || "null")?.email || "guest"}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const loadTickets = useCallback(async () => {
     setLoading(true);
@@ -499,8 +909,90 @@ export default function App() {
           ticket.priority === "CRITICAL" &&
           !["RESOLVED", "CLOSED"].includes(ticket.status)
       ).length,
+      unassigned: tickets.filter(
+        (ticket) => !ticket.assignedTo || !String(ticket.assignedTo).trim()
+      ).length,
     };
   }, [tickets]);
+
+  const notifications = useMemo(() => {
+    if (!currentUser) return [];
+
+    const items = [];
+    const isSupport = ["ADMIN", "AGENT"].includes(currentUser.role);
+
+    tickets.forEach((ticket) => {
+      const status = ticket.status || "OPEN";
+      const unresolved = !["RESOLVED", "CLOSED"].includes(status);
+      const assigned = Boolean(ticket.assignedTo && String(ticket.assignedTo).trim());
+      const createdByMe = [currentUser.email, currentUser.fullName]
+        .filter(Boolean)
+        .some((value) => String(ticket.createdBy || "").toLowerCase() === String(value).toLowerCase());
+
+      if (isSupport && ticket.priority === "CRITICAL" && unresolved) {
+        items.push({
+          id: `critical-${ticket.id}`,
+          ticketId: ticket.id,
+          title: `Critical ticket #${ticket.id}`,
+          message: ticket.title || "A critical ticket needs attention.",
+          kind: "critical",
+          createdAt: ticket.createdAt,
+        });
+      }
+
+      if (isSupport && currentUser.role === "ADMIN" && unresolved && !assigned) {
+        items.push({
+          id: `unassigned-${ticket.id}`,
+          ticketId: ticket.id,
+          title: `Ticket #${ticket.id} is unassigned`,
+          message: ticket.title || "Assign this ticket to a support agent.",
+          kind: "unassigned",
+          createdAt: ticket.createdAt,
+        });
+      }
+
+      if (!isSupport && createdByMe && unresolved) {
+        items.push({
+          id: `my-ticket-${ticket.id}-${status}`,
+          ticketId: ticket.id,
+          title: `Ticket #${ticket.id}: ${String(status).replaceAll("_", " ").toLowerCase()}`,
+          message: ticket.title || "Your support request has an update.",
+          kind: status === "IN_PROGRESS" ? "progress" : "ticket",
+          createdAt: ticket.createdAt,
+        });
+      }
+    });
+
+    return items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }, [tickets, currentUser]);
+
+  const unreadNotificationCount = notifications.filter(
+    (item) => !readNotificationIds.includes(item.id)
+  ).length;
+
+  useEffect(() => {
+    if (!currentUser?.email) return;
+    localStorage.setItem(
+      `flowdesk-read-notifications-${currentUser.email}`,
+      JSON.stringify(readNotificationIds)
+    );
+  }, [readNotificationIds, currentUser]);
+
+  function markAllNotificationsRead() {
+    setReadNotificationIds((current) => Array.from(new Set([
+      ...current,
+      ...notifications.map((item) => item.id),
+    ])));
+  }
+
+  function openNotification(item) {
+    setReadNotificationIds((current) => current.includes(item.id) ? current : [...current, item.id]);
+    setSearchTerm(String(item.ticketId));
+    setStatusFilter("ALL");
+    setCategoryFilter("ALL");
+    setActivePage("Tickets");
+    setNotificationsOpen(false);
+  }
 
   const filteredTickets = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -528,10 +1020,18 @@ export default function App() {
       );
     }
 
+    if (statusFilter !== "ALL") {
+      result = result.filter((ticket) => (ticket.status || "OPEN") === statusFilter);
+    }
+
+    if (categoryFilter !== "ALL") {
+      result = result.filter((ticket) => (ticket.category || "General") === categoryFilter);
+    }
+
     return [...result].sort((a, b) => {
       return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
     });
-  }, [tickets, searchTerm, activePage]);
+  }, [tickets, searchTerm, activePage, statusFilter, categoryFilter]);
 
   async function createTicket(ticket) {
     setLoading(true);
@@ -572,6 +1072,28 @@ export default function App() {
     }
   }
 
+  async function assignTicket(id, agentEmail) {
+    setError("");
+
+    try {
+      const updated = await ticketApi.assign(id, agentEmail);
+      setTickets((current) =>
+        current.map((ticket) =>
+          ticket.id === id ? { ...ticket, ...updated } : ticket
+        )
+      );
+      return true;
+    } catch (err) {
+      console.error("Unable to assign ticket:", err);
+      setError(
+        err.response?.data?.detail ||
+          err.response?.data?.message ||
+          "Could not assign ticket. Enter the email of an existing AGENT account."
+      );
+      return false;
+    }
+  }
+
   async function deleteTicket(id) {
     const confirmed = window.confirm(
       `Are you sure you want to delete ticket #${id}?`
@@ -601,6 +1123,8 @@ export default function App() {
     setCurrentUser(null);
     setTickets([]);
     setSearchTerm("");
+    setStatusFilter("ALL");
+    setCategoryFilter("ALL");
     setActivePage("Dashboard");
     setShowCreateModal(false);
     setError("");
@@ -654,7 +1178,9 @@ export default function App() {
         <div className="workspace-label">WORKSPACE</div>
 
         <nav className="navigation">
-          {navigation.map(({ name, icon: Icon }) => (
+          {navigation
+            .filter(({ name }) => name !== "Users" || currentUser.role === "ADMIN")
+            .map(({ name, icon: Icon }) => (
             <button
               key={name}
               className={`nav-item ${
@@ -741,20 +1267,78 @@ export default function App() {
               )}
             </label>
 
-            <button
-              className="icon-button notification-button"
-              title="Notifications"
-              onClick={() =>
-                window.alert(
-                  counts.critical
-                    ? `You have ${counts.critical} unresolved critical ticket(s).`
-                    : "You have no critical ticket alerts."
-                )
-              }
-            >
-              <Bell size={18} />
-              {counts.critical > 0 && <span className="notification-dot" />}
-            </button>
+            <div className="notification-wrapper">
+              <button
+                className="icon-button notification-button"
+                title="Notifications"
+                aria-label={`Notifications, ${unreadNotificationCount} unread`}
+                aria-expanded={notificationsOpen}
+                onClick={() => setNotificationsOpen((open) => !open)}
+              >
+                <Bell size={18} />
+                {unreadNotificationCount > 0 && (
+                  <span className="notification-count-badge">
+                    {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+
+              {notificationsOpen && (
+                <section className="notification-popover" aria-label="Notifications panel">
+                  <div className="notification-popover-header">
+                    <div>
+                      <h3>Notifications</h3>
+                      <p>{unreadNotificationCount} unread</p>
+                    </div>
+                    <div className="notification-header-actions">
+                      {unreadNotificationCount > 0 && (
+                        <button type="button" className="notification-text-button" onClick={markAllNotificationsRead}>
+                          <Check size={14} /> Mark all read
+                        </button>
+                      )}
+                      <button type="button" className="notification-close" aria-label="Close notifications" onClick={() => setNotificationsOpen(false)}>
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {notifications.length === 0 ? (
+                    <div className="notification-empty">
+                      <span className="notification-empty-icon"><Bell size={20} /></span>
+                      <strong>You're all caught up</strong>
+                      <p>New ticket alerts will appear here when there is something to review.</p>
+                    </div>
+                  ) : (
+                    <div className="notification-list">
+                      {notifications.map((item) => {
+                        const isRead = readNotificationIds.includes(item.id);
+                        return (
+                          <button
+                            type="button"
+                            key={item.id}
+                            className={`notification-item ${isRead ? "is-read" : "is-unread"} ${item.kind}`}
+                            onClick={() => openNotification(item)}
+                          >
+                            <span className="notification-item-icon">
+                              {item.kind === "critical" ? <AlertCircle size={17} /> : item.kind === "unassigned" ? <Users size={17} /> : item.kind === "progress" ? <Activity size={17} /> : <Ticket size={17} />}
+                            </span>
+                            <span className="notification-item-copy">
+                              <strong>{item.title}</strong>
+                              <span>{item.message}</span>
+                              <small>{formatDate(item.createdAt)}</small>
+                            </span>
+                            {!isRead && <span className="notification-unread-dot" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <button type="button" className="notification-view-all" onClick={() => { setActivePage("Tickets"); setNotificationsOpen(false); }}>
+                    View tickets <span>→</span>
+                  </button>
+                </section>
+              )}
+            </div>
 
             <button
               className="theme-button"
@@ -780,11 +1364,13 @@ export default function App() {
               <p className="eyebrow">OVERVIEW</p>
               <h1>
                 {activePage === "Dashboard"
-                  ? "Dashboard"
+                  ? (currentUser.role === "ADMIN" ? "Admin overview" : currentUser.role === "AGENT" ? "Agent workspace" : "Dashboard")
                   : activePage}
               </h1>
               <p className="welcome-text">
-                Welcome back, {currentUser.fullName.split(" ")[0]}. Here's what's happening with your team.
+                {currentUser.role === "EMPLOYEE"
+                  ? `Welcome back, ${currentUser.fullName.split(" ")[0]}. Track your support requests and follow their progress.`
+                  : `Welcome back, ${currentUser.fullName.split(" ")[0]}. Here's what's happening with your team.`}
               </p>
             </div>
 
@@ -826,7 +1412,7 @@ export default function App() {
               <div className="stats-grid">
                 <article className="stat-card">
                   <div className="stat-top">
-                    <span>Total tickets</span>
+                    <span>{currentUser.role === "EMPLOYEE" ? "My tickets" : "Total tickets"}</span>
                     <div className="stat-icon blue">
                       <ClipboardList size={20} />
                     </div>
@@ -883,13 +1469,43 @@ export default function App() {
                     </span>
                   </div>
                 </article>
+
+                {currentUser.role === "ADMIN" && (
+                  <>
+                    <article className="stat-card">
+                      <div className="stat-top">
+                        <span>Unassigned tickets</span>
+                        <div className="stat-icon orange">
+                          <Users size={20} />
+                        </div>
+                      </div>
+                      <strong className="stat-number">{counts.unassigned}</strong>
+                      <div className="stat-footer">
+                        <span className="stat-neutral">Need an agent assigned</span>
+                      </div>
+                    </article>
+
+                    <article className="stat-card">
+                      <div className="stat-top">
+                        <span>Critical active</span>
+                        <div className="stat-icon purple">
+                          <AlertCircle size={20} />
+                        </div>
+                      </div>
+                      <strong className="stat-number">{counts.critical}</strong>
+                      <div className="stat-footer">
+                        <span className="stat-neutral">Require attention</span>
+                      </div>
+                    </article>
+                  </>
+                )}
               </div>
 
               <section className="ticket-panel">
                 <div className="panel-header">
                   <div>
-                    <h2>Recent tickets</h2>
-                    <p>Monitor and manage your latest support requests.</p>
+                    <h2>{currentUser.role === "EMPLOYEE" ? "My recent tickets" : currentUser.role === "ADMIN" ? "Workspace tickets" : "Recent tickets"}</h2>
+                    <p>{currentUser.role === "EMPLOYEE" ? "Check the latest updates on tickets you have submitted." : currentUser.role === "ADMIN" ? "Review incoming requests, priorities, assignments, and status." : "Review tickets currently assigned across the support team."}</p>
                   </div>
 
                   <button
@@ -908,8 +1524,10 @@ export default function App() {
                 ) : (
                   <TicketTable
                     tickets={filteredTickets.slice(0, 5)}
+                    currentUser={currentUser}
                     onStatusChange={changeStatus}
                     onDelete={deleteTicket}
+                    onAssign={assignTicket}
                   />
                 )}
               </section>
@@ -920,11 +1538,42 @@ export default function App() {
             <section className="ticket-panel">
               <div className="panel-header">
                 <div>
-                  <h2>All tickets</h2>
+                  <h2>{currentUser.role === "EMPLOYEE" ? "My tickets" : "All tickets"}</h2>
                   <p>
                     {filteredTickets.length} ticket(s) match your search.
                   </p>
                 </div>
+              </div>
+
+              <div className="ticket-filters">
+                <label>
+                  <span>Status</span>
+                  <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                    <option value="ALL">All statuses</option>
+                    <option value="OPEN">Open</option>
+                    <option value="IN_PROGRESS">In progress</option>
+                    <option value="RESOLVED">Resolved</option>
+                    <option value="CLOSED">Closed</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Category</span>
+                  <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+                    <option value="ALL">All categories</option>
+                    {[...new Set(tickets.map((ticket) => ticket.category || "General"))].sort().map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </label>
+                {(statusFilter !== "ALL" || categoryFilter !== "ALL") && (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => { setStatusFilter("ALL"); setCategoryFilter("ALL"); }}
+                  >
+                    Clear filters
+                  </button>
+                )}
               </div>
 
               {loading && tickets.length === 0 ? (
@@ -935,92 +1584,192 @@ export default function App() {
               ) : (
                 <TicketTable
                   tickets={filteredTickets}
+                  currentUser={currentUser}
                   onStatusChange={changeStatus}
                   onDelete={deleteTicket}
+                  onAssign={assignTicket}
                 />
               )}
             </section>
           )}
 
           {activePage === "Users" && (
-            <section className="placeholder-panel">
-              <div className="placeholder-icon">
-                <Users size={27} />
-              </div>
-              <h2>User management</h2>
-              <p>
-                User accounts and role-based access can be added when
-                authentication is implemented in the backend.
-              </p>
-            </section>
+            <UserManagement currentUser={currentUser} />
           )}
 
-          {activePage === "Reports" && (
-            <section className="reports-grid">
-              <article className="report-card">
-                <div className="stat-icon blue">
-                  <ClipboardList size={20} />
+          {activePage === "Reports" && (() => {
+            const reportStatuses = [
+              { label: "Open", value: counts.open, color: "#f59e0b" },
+              { label: "In progress", value: counts.progress, color: "#8b5cf6" },
+              { label: "Resolved / Closed", value: counts.resolved, color: "#22c55e" },
+            ];
+            const categoryCounts = tickets.reduce((result, ticket) => {
+              const category = ticket.category || "General";
+              result[category] = (result[category] || 0) + 1;
+              return result;
+            }, {});
+            const categories = Object.entries(categoryCounts)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 6);
+            const maxCategoryCount = Math.max(1, ...categories.map((item) => item[1]));
+            const resolvedRate = counts.total
+              ? Math.round((counts.resolved / counts.total) * 100)
+              : 0;
+            return (
+              <div className="reports-page">
+                <div className="reports-intro">
+                  <div>
+                    <span className="eyebrow">WORKSPACE ANALYTICS</span>
+                    <h2>Ticket reports</h2>
+                    <p>A clear overview of support demand and resolution progress.</p>
+                  </div>
+                  <div className="reports-live-label"><span /> Based on current ticket data</div>
                 </div>
-                <span>Total tickets</span>
-                <strong>{counts.total}</strong>
-              </article>
-              <article className="report-card">
-                <div className="stat-icon orange">
-                  <Clock3 size={20} />
+
+                <section className="reports-metrics">
+                  <article className="report-metric report-metric-blue">
+                    <div className="report-metric-top"><span>Total tickets</span><ClipboardList size={19} /></div>
+                    <strong>{counts.total}</strong>
+                    <small>Tickets visible to your account</small>
+                  </article>
+                  <article className="report-metric report-metric-orange">
+                    <div className="report-metric-top"><span>Open tickets</span><AlertCircle size={19} /></div>
+                    <strong>{counts.open}</strong>
+                    <small>Waiting for support</small>
+                  </article>
+                  <article className="report-metric report-metric-purple">
+                    <div className="report-metric-top"><span>In progress</span><Activity size={19} /></div>
+                    <strong>{counts.progress}</strong>
+                    <small>Currently being handled</small>
+                  </article>
+                  <article className="report-metric report-metric-green">
+                    <div className="report-metric-top"><span>Resolved / closed</span><CheckCircle2 size={19} /></div>
+                    <strong>{counts.resolved}</strong>
+                    <small>{resolvedRate}% resolution rate</small>
+                  </article>
+                </section>
+
+                <div className="reports-analysis-grid">
+                  <section className="report-analysis-card">
+                    <div className="report-section-heading">
+                      <div><h3>Status breakdown</h3><p>Where tickets stand right now</p></div>
+                      <BarChart3 size={19} />
+                    </div>
+                    <div className="report-status-list">
+                      {reportStatuses.map((item) => {
+                        const percentage = counts.total ? Math.round((item.value / counts.total) * 100) : 0;
+                        return (
+                          <div className="report-status-item" key={item.label}>
+                            <div className="report-status-label"><span><i style={{ background: item.color }} />{item.label}</span><strong>{item.value}<small>{percentage}%</small></strong></div>
+                            <div className="report-progress-track"><span style={{ width: `${percentage}%`, background: item.color }} /></div>
+                          </div>
+                        );
+                      })}
+                      {counts.total === 0 && <p className="report-empty-note">No ticket data is available yet.</p>}
+                    </div>
+                  </section>
+
+                  <section className="report-analysis-card">
+                    <div className="report-section-heading">
+                      <div><h3>Tickets by category</h3><p>Most common support request types</p></div>
+                      <ClipboardList size={19} />
+                    </div>
+                    {categories.length ? (
+                      <div className="report-category-list">
+                        {categories.map(([category, value]) => (
+                          <div className="report-category-item" key={category}>
+                            <div className="report-category-label"><span>{category}</span><strong>{value}</strong></div>
+                            <div className="report-progress-track"><span style={{ width: `${(value / maxCategoryCount) * 100}%` }} /></div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="report-empty-note">Categories will appear when tickets are created.</p>}
+                  </section>
                 </div>
-                <span>Still open or in progress</span>
-                <strong>{counts.open + counts.progress}</strong>
-              </article>
-              <article className="report-card">
-                <div className="stat-icon green">
-                  <CheckCircle2 size={20} />
-                </div>
-                <span>Resolved or closed</span>
-                <strong>{counts.resolved}</strong>
-              </article>
-            </section>
-          )}
+
+                <section className="report-resolution-card">
+                  <div className="report-resolution-icon"><CheckCircle2 size={22} /></div>
+                  <div className="report-resolution-copy"><h3>Resolution overview</h3><p>{counts.resolved} of {counts.total} tickets are resolved or closed.</p></div>
+                  <div className="report-resolution-value">{resolvedRate}%</div>
+                  <div className="report-resolution-track"><span style={{ width: `${resolvedRate}%` }} /></div>
+                </section>
+              </div>
+            );
+          })()}
 
           {activePage === "Settings" && (
-            <section className="settings-panel">
-              <div className="settings-row">
-                <div className="settings-icon">
-                  {theme === "light" ? (
-                    <Sun size={20} />
-                  ) : (
-                    <Moon size={20} />
-                  )}
+            <div className="fd-settings">
+              <div className="fd-settings-heading">
+                <div>
+                  <span className="eyebrow">YOUR WORKSPACE</span>
+                  <h2>Workspace settings</h2>
+                  <p>Manage your account, appearance, and connection preferences.</p>
                 </div>
-                <div className="settings-copy">
-                  <strong>Appearance</strong>
-                  <span>Choose your preferred dashboard theme.</span>
-                </div>
-                <button
-                  className="secondary-button"
-                  onClick={() =>
-                    setTheme((current) =>
-                      current === "light" ? "dark" : "light"
-                    )
-                  }
-                >
-                  Switch to {theme === "light" ? "dark" : "light"}
-                </button>
               </div>
 
-              <div className="settings-row">
-                <div className="settings-icon">
-                  <Activity size={20} />
+              <section className="fd-settings-card">
+                <div className="fd-settings-card-title">
+                  <div className="fd-settings-symbol"><Users size={19} /></div>
+                  <div><h3>My account</h3><p>Your signed-in FlowDesk profile</p></div>
                 </div>
-                <div className="settings-copy">
-                  <strong>Backend connection</strong>
-                  <span>API endpoint: localhost:8080/api/tickets</span>
+                <div className="fd-settings-profile">
+                  <div className="fd-settings-avatar">{getInitials(currentUser.fullName)}</div>
+                  <div><strong>{currentUser.fullName}</strong><span>{currentUser.email}</span></div>
+                  <span className="fd-settings-role">{readable(currentUser.role)}</span>
                 </div>
-                <button className="secondary-button" onClick={loadTickets}>
-                  <RefreshCw size={15} />
-                  Test connection
-                </button>
-              </div>
-            </section>
+                <div className="fd-settings-detail-grid">
+                  <div><span>Full name</span><strong>{currentUser.fullName}</strong></div>
+                  <div><span>Email address</span><strong>{currentUser.email}</strong></div>
+                  <div><span>Account role</span><strong>{readable(currentUser.role)}</strong></div>
+                </div>
+                <p className="fd-settings-note">Account details are read-only. Contact an administrator if your details need updating.</p>
+              </section>
+
+              <section className="fd-settings-card">
+                <div className="fd-settings-card-title">
+                  <div className="fd-settings-symbol"><Moon size={19} /></div>
+                  <div><h3>Appearance</h3><p>Choose how FlowDesk looks on this device</p></div>
+                </div>
+                <div className="fd-settings-theme-options" role="group" aria-label="Color theme">
+                  <button type="button" className={`fd-settings-theme-choice ${theme === "dark" ? "selected" : ""}`} onClick={() => setTheme("dark")} aria-pressed={theme === "dark"}>
+                    <Moon size={19} /><span><strong>Dark</strong><small>Comfortable dark workspace</small></span>{theme === "dark" && <Check size={17} />}
+                  </button>
+                  <button type="button" className={`fd-settings-theme-choice ${theme === "light" ? "selected" : ""}`} onClick={() => setTheme("light")} aria-pressed={theme === "light"}>
+                    <Sun size={19} /><span><strong>Light</strong><small>Bright workspace</small></span>{theme === "light" && <Check size={17} />}
+                  </button>
+                </div>
+                <p className="fd-settings-note">Your preference is saved automatically in this browser.</p>
+              </section>
+
+              <section className="fd-settings-card">
+                <div className="fd-settings-card-title">
+                  <div className="fd-settings-symbol"><Activity size={19} /></div>
+                  <div><h3>System connection</h3><p>Check whether the ticket service is reachable</p></div>
+                </div>
+                <div className="fd-settings-connection">
+                  <div><strong>Spring Boot API</strong><span>localhost:8080/api/tickets</span></div>
+                  <button type="button" className="secondary-button" disabled={connectionState === "checking"} onClick={async () => {
+                    setConnectionState("checking");
+                    try { await ticketApi.getAll(); setConnectionState("online"); }
+                    catch { setConnectionState("offline"); }
+                  }}><RefreshCw size={15} className={connectionState === "checking" ? "spin" : ""} /> {connectionState === "checking" ? "Checking..." : "Test connection"}</button>
+                </div>
+                <div className={`fd-settings-connection-status ${connectionState}`} role="status">
+                  {connectionState === "online" ? "Connected successfully" : connectionState === "offline" ? "Connection failed. Check your backend and login." : connectionState === "checking" ? "Checking connection..." : "Run a connection test to check the API."}
+                </div>
+              </section>
+
+              <section className="fd-settings-card">
+                <div className="fd-settings-card-title">
+                  <div className="fd-settings-symbol"><ShieldCheck size={19} /></div>
+                  <div><h3>Session & security</h3><p>Manage your current sign-in session</p></div>
+                </div>
+                <div className="fd-settings-connection">
+                  <div><strong>Signed in</strong><span>Log out when using a shared device.</span></div>
+                  <button type="button" className="fd-settings-logout" onClick={handleLogout}><LogOut size={16} /> Sign out</button>
+                </div>
+              </section>
+            </div>
           )}
 
           <footer className="app-footer">

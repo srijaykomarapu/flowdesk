@@ -1,0 +1,266 @@
+/* FlowDesk ticket page polish — complements the existing App.css */
+.app .ticket-panel {
+  overflow: visible;
+  border-radius: 16px;
+}
+
+.app .ticket-panel > .panel-header {
+  padding: 24px 28px 20px;
+  align-items: center;
+  gap: 16px;
+}
+
+.app .ticket-panel > .panel-header h2 {
+  margin: 0 0 7px;
+  font-size: 20px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.app .ticket-panel > .panel-header p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted, #94a3b8);
+}
+
+.app .ticket-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 16px 28px;
+  background: var(--panel-subtle, rgba(148, 163, 184, 0.045));
+  border-top: 1px solid var(--border-color, #263449);
+  border-bottom: 1px solid var(--border-color, #263449);
+}
+
+.app .ticket-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 170px;
+  color: var(--text-secondary, #aab8cc);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.app .ticket-filters label span {
+  line-height: 1.2;
+}
+
+.app .ticket-filters select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 36px 0 12px;
+  appearance: auto;
+  color: var(--text-primary, #e8eef8);
+  background-color: var(--input-bg, #0f1b2d);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.app:not(.dark) .ticket-filters select {
+  color: var(--text-primary, #1e293b);
+  background-color: #fff;
+  border-color: #d5deea;
+  color-scheme: light;
+}
+
+.app .ticket-filters select:focus-visible {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
+}
+
+.app .ticket-filters .secondary-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.app .table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 0 0 16px 16px;
+}
+
+.app .ticket-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 900px;
+}
+
+.app .ticket-table thead th {
+  padding: 16px 20px;
+  color: var(--text-secondary, #aab8cc);
+  background: var(--table-head-bg, #0b1423);
+  border-bottom: 1px solid var(--border-color, #263449);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.app .ticket-table tbody td {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border-color, #263449);
+  vertical-align: middle;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.app .ticket-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.app .ticket-table tbody tr:hover td {
+  background: rgba(129, 140, 248, 0.035);
+}
+
+.app .ticket-table .ticket-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 180px;
+}
+
+.app .ticket-table .ticket-title > strong {
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.app .ticket-table .ticket-description {
+  max-width: 280px;
+  color: var(--muted, #94a3b8);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.app .ticket-table .ticket-id {
+  color: #818cf8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.app .ticket-table .status-select {
+  max-width: 145px;
+  min-height: 34px;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.app .ticket-table .agent-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  width: 210px;
+  min-width: 190px;
+}
+
+.app .ticket-table .agent-picker input {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  background: var(--input-bg, #0f1b2d);
+  color: var(--text-primary, #e8eef8);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.app .ticket-table .agent-picker input::placeholder {
+  color: var(--muted, #94a3b8);
+}
+
+.app .ticket-table .agent-picker .secondary-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.app .ticket-table .agent-options {
+  top: calc(100% - 40px);
+  left: 0;
+  width: 100%;
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 5px;
+  box-sizing: border-box;
+  background: var(--dropdown-bg, #111c2e);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  z-index: 1000;
+}
+
+.app .ticket-table .agent-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-primary, #e8eef8);
+  text-align: left;
+  cursor: pointer;
+}
+
+.app .ticket-table .agent-option:hover {
+  background: rgba(129, 140, 248, 0.12);
+}
+
+.app .ticket-table .agent-option strong {
+  color: inherit;
+  font-size: 12px;
+}
+
+.app .ticket-table .agent-option small {
+  color: #a5b4fc;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.app .ticket-table .agent-empty {
+  display: block;
+  padding: 12px 8px;
+  color: var(--muted, #94a3b8);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .app .ticket-panel > .panel-header {
+    padding: 20px 16px 16px;
+  }
+
+  .app .ticket-filters {
+    padding: 14px 16px;
+    gap: 10px;
+  }
+
+  .app .ticket-filters label {
+    flex: 1 1 145px;
+    min-width: 0;
+  }
+}
