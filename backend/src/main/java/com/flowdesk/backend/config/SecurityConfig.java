@@ -40,56 +40,43 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint((request, response, exception) ->
-                    response.sendError(
-                        HttpServletResponse.SC_UNAUTHORIZED)))
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> auth
 
                 // Allow CORS preflight requests
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // Public authentication endpoints
+                // Public registration and login
                 .requestMatchers("/api/auth/**").permitAll()
 
-                // User Management: admins only
-                .requestMatchers(
-                    HttpMethod.GET, "/api/users"
-                ).hasRole("ADMIN")
+                // User management: admins only
+                .requestMatchers(HttpMethod.GET, "/api/users")
+                    .hasRole("ADMIN")
 
-                .requestMatchers(
-                    HttpMethod.PATCH, "/api/users/*/role"
-                ).hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PATCH, "/api/users/*/role")
+                    .hasRole("ADMIN")
 
-                // Only agents and admins can fetch the agent list
-                .requestMatchers(
-                    HttpMethod.GET, "/api/users/agents"
-                ).hasAnyRole("AGENT", "ADMIN")
+                // Agent directory: agents and admins
+                .requestMatchers(HttpMethod.GET, "/api/users/agents")
+                    .hasAnyRole("AGENT", "ADMIN")
 
-                // Only agents and admins can update ticket status or assignment
+                // Ticket status and assignment: agents and admins
                 .requestMatchers(
                     HttpMethod.PATCH,
                     "/api/tickets/*/status",
                     "/api/tickets/*/assignment"
                 ).hasAnyRole("AGENT", "ADMIN")
 
-                // Only admins can delete tickets
-                .requestMatchers(
-                    HttpMethod.DELETE, "/api/tickets/**"
-                ).hasRole("ADMIN")
+                // Ticket deletion: admins only
+                .requestMatchers(HttpMethod.DELETE, "/api/tickets/**")
+                    .hasRole("ADMIN")
 
-                // Authenticated users can view and create tickets
-                .requestMatchers(
-                    HttpMethod.GET, "/api/tickets/**"
-                ).authenticated()
+                // Ticket endpoints: authenticated users
+                .requestMatchers("/api/tickets/**")
+                    .authenticated()
 
-                .requestMatchers(
-                    HttpMethod.POST, "/api/tickets/**"
-                ).authenticated()
-
-                // Protect other ticket endpoints
-                .requestMatchers("/api/tickets/**").authenticated()
-
-                // Other endpoints follow their own controller rules
-                .anyRequest().permitAll()
+                // All other endpoints require authentication
+                .anyRequest().authenticated()
             )
             .addFilterBefore(
                 jwtAuthenticationFilter,
