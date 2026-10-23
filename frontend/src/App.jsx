@@ -1747,7 +1747,7 @@ export default function App() {
                   <div><h3>System connection</h3><p>Check whether the ticket service is reachable</p></div>
                 </div>
                 <div className="fd-settings-connection">
-                  <div><strong>Spring Boot API</strong><span>localhost:8080/api/tickets</span></div>
+                  <div><strong>Spring Boot API</strong><span>https://flowdesk-xugd.onrender.com/api/tickets</span></div>
                   <button type="button" className="secondary-button" disabled={connectionState === "checking"} onClick={async () => {
                     setConnectionState("checking");
                     try { await ticketApi.getAll(); setConnectionState("online"); }
